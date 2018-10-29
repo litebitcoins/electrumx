@@ -34,7 +34,7 @@ import logging
 import re
 import sys
 from collections import Container, Mapping
-from struct import pack
+from struct import pack, Struct
 
 
 class LoggedClass(object):
@@ -160,7 +160,7 @@ def int_to_bytes(value):
 def int_to_varint(value):
     '''Converts an integer to a Bitcoin-like varint bytes'''
     if value < 0:
-        raise Exception("attempt to write size < 0")
+        raise ValueError("attempt to write size < 0")
     elif value < 253:
         return pack('<B', value)
     elif value < 2**16:
@@ -269,3 +269,51 @@ def is_valid_hostname(hostname):
     if hostname and hostname[-1] == ".":
         hostname = hostname[:-1]
     return all(SEGMENT_REGEX.match(x) for x in hostname.split("."))
+
+def protocol_tuple(s):
+    '''Converts a protocol version number, such as "1.0" to a tuple (1, 0).
+
+    If the version number is bad, (0, ) indicating version 0 is returned.'''
+    try:
+        return tuple(int(part) for part in s.split('.'))
+    except Exception:
+        return (0, )
+
+def protocol_version_string(ptuple):
+    '''Convert a version tuple such as (1, 2) to "1.2".
+    There is always at least one dot, so (1, ) becomes "1.0".'''
+    while len(ptuple) < 2:
+        ptuple += (0, )
+    return '.'.join(str(p) for p in ptuple)
+
+def protocol_version(client_req, server_min, server_max):
+    '''Given a client protocol request, return the protocol version
+    to use as a tuple.
+
+    If a mutually acceptable protocol version does not exist, return None.
+    '''
+    if isinstance(client_req, list) and len(client_req) == 2:
+        client_min, client_max = client_req
+    elif client_req is None:
+        client_min = client_max = server_min
+    else:
+        client_min = client_max = client_req
+
+    client_min = protocol_tuple(client_min)
+    client_max = protocol_tuple(client_max)
+    server_min = protocol_tuple(server_min)
+    server_max = protocol_tuple(server_max)
+
+    result = min(client_max, server_max)
+    if result < max(client_min, server_min) or result == (0, ):
+        result = None
+
+    return result
+
+unpack_int32_from = Struct('<i').unpack_from
+unpack_int64_from = Struct('<q').unpack_from
+unpack_uint16_from = Struct('<H').unpack_from
+unpack_uint32_from = Struct('<I').unpack_from
+unpack_uint64_from = Struct('<Q').unpack_from
+
+hex_to_bytes = bytes.fromhex

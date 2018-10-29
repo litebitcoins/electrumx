@@ -1,20 +1,16 @@
 Peer Discovery
 ==============
 
-This is a suggestion of a peer discovery prtocol as a way to gradually
-move off depending on IRC.
-
-It will be implemented in ElectrumX from version 0.11.0
-onwards.
+This was imlpemented in ElectrumX as of version 0.11.0.  Support for
+IRC peer discovery was removed in ElectrumX version 1.2.1.
 
 
 Peer Database
 -------------
 
-A persistent store of peers with at least the following information
-about a peer so that state persists across server restarts.  This
-information is required for a response to the **server.peers.subscribe**
-RPC call:
+An in-memory store of peers with at least the following information
+about a peer, required for a response to the
+**server.peers.subscribe** RPC call:
 
 * host name
 * ip address
@@ -53,13 +49,8 @@ The server should craft its response in a way that reduces the
 effectiveness of sybil attacks and peer spamming.
 
 The response should only include peers it has successfully connected
-to recently.  If Tor routing is not available, so their existence
-cannot be verified, the response should include some hard-coded onion
-peers so that clients always have a choice of onion servers.
-
-Only reporting recent good peers ensures that those that have gone
-offline will not be passed around for long (ignoring for hard-coded
-onion peer exception).
+to recently.  Only reporting recent good peers ensures that those that
+have gone offline will not be passed around for long.
 
 In ElectrumX, "recently" is taken to be the last 24 hours.  Only one
 peer from each IPv4/16 netmask is returned, and the number of onion
@@ -159,15 +150,13 @@ Unknown keys should be silently ignored.
 * **protocol_max**
 * **protocol_min**
 
-  Strings that are the minimum and maximum Electrum protcol versions
-  this server speaks.  The maximum value should be the same as what
-  would suffix the letter **v** in the IRC real name.  Example: "1.1".
+  Strings that are the minimum and maximum Electrum protocol versions
+  this server speaks.  Example: "1.1".
 
 * **pruning**
 
   An integer, the pruning limit.  Omit or set to *null* if there is no
-  pruning limit.  Should be the same as what would suffix the letter
-  **p** in the IRC real name.
+  pruning limit.
 
 
 server.add_peer RPC call
@@ -188,18 +177,6 @@ To prevent abuse a server may do nothing with second and subsequent
 calls to this method from a single connection.
 
 The result should be True if accepted and False otherwise.
-
-
-IRC
----
-
-Other server implementations may not have implemented the peer
-discovery protocol yet.  Whilst we transition away from IRC, in order
-to keep these servers in the connected peer set, having one or two in
-the hard-coded peer list used to seed this process should suffice.
-Any peer on IRC will report other peers on IRC, and so if any one of
-them is known to any single peer implementing this protocol, they will
-all become known to all peers quite rapidly.
 
 
 Notes to Implementators

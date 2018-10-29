@@ -32,7 +32,7 @@ class DB(util.LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [5]
+    DB_VERSIONS = [6]
 
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
@@ -315,7 +315,7 @@ class DB(util.LoggedClass):
                 genesis_hash = genesis_hash.decode()
             if genesis_hash != self.coin.GENESIS_HASH:
                 raise self.DBError('DB genesis hash {} does not match coin {}'
-                                   .format(state['genesis_hash'],
+                                   .format(genesis_hash,
                                            self.coin.GENESIS_HASH))
             self.db_height = state['height']
             self.db_tx_count = state['tx_count']
@@ -571,7 +571,7 @@ class DB(util.LoggedClass):
         if nrows > 4:
             self.log_info('hashX {} is large: {:,d} entries across {:,d} rows'
                           .format(hash_to_str(hashX), len(full_hist) // 4,
-                                  nrows));
+                                  nrows))
 
         # Find what history needs to be written, and what keys need to
         # be deleted.  Start by assuming all keys are to be deleted,
@@ -660,7 +660,6 @@ class DB(util.LoggedClass):
         limit = 50 * 1000 * 1000
 
         while self.comp_cursor != -1:
-            locked = self.semaphore.locked
             if self.semaphore.locked:
                 self.log_info('compact_history: waiting on semaphore...')
             with await self.semaphore:

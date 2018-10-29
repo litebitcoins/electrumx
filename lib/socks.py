@@ -136,7 +136,7 @@ class Socks(util.LoggedClass):
 
 class SocksProxy(util.LoggedClass):
 
-    def __init__(self, host, port, loop=None):
+    def __init__(self, host, port, loop):
         '''Host can be an IPv4 address, IPv6 address, or a host name.
         Port can be None, in which case one is auto-detected.'''
         super().__init__()
@@ -147,7 +147,7 @@ class SocksProxy(util.LoggedClass):
         self.ip_addr = None
         self.lost_event = asyncio.Event()
         self.tried_event = asyncio.Event()
-        self.loop = loop or asyncio.get_event_loop()
+        self.loop = loop
         self.set_lost()
 
     async def auto_detect_loop(self):
@@ -224,7 +224,7 @@ class SocksProxy(util.LoggedClass):
         self.logger.info('detected proxy at {} ({})'
                          .format(util.address_string(paddress), self.ip_addr))
 
-    async def create_connection(self, protocol_factory, host, port, ssl=None):
+    async def create_connection(self, protocol_factory, host, port, **kwargs):
         '''All arguments are as to asyncio's create_connection method.'''
         try:
             sock = await self.connect_via_proxy(host, port)
@@ -236,6 +236,6 @@ class SocksProxy(util.LoggedClass):
                 self.set_lost()
             raise
 
-        hostname = host if ssl else None
+        hostname = host if kwargs.get('ssl') else None
         return await self.loop.create_connection(
-            protocol_factory, ssl=ssl, sock=sock, server_hostname=hostname)
+            protocol_factory, sock=sock, server_hostname=hostname, **kwargs)

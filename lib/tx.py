@@ -29,10 +29,11 @@
 
 
 from collections import namedtuple
-from struct import unpack_from
 
-from lib.util import cachedproperty
 from lib.hash import double_sha256, hash_to_str
+from lib.util import (cachedproperty, unpack_int32_from, unpack_int64_from,
+                      unpack_uint16_from, unpack_uint32_from,
+                      unpack_uint64_from)
 
 
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
@@ -66,6 +67,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
     pass
 
+
 class Deserializer(object):
     '''Deserializes blocks into transactions.
 
@@ -78,6 +80,7 @@ class Deserializer(object):
     def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
         self.binary = binary
+        self.binary_length = len(binary)
         self.cursor = start
 
     def read_tx(self):
@@ -131,7 +134,7 @@ class Deserializer(object):
     def _read_nbytes(self, n):
         cursor = self.cursor
         self.cursor = end = cursor + n
-        assert len(self.binary) >= end
+        assert self.binary_length >= end
         return self.binary[cursor:end]
 
     def _read_varbytes(self):
@@ -149,27 +152,27 @@ class Deserializer(object):
         return self._read_le_uint64()
 
     def _read_le_int32(self):
-        result, = unpack_from('<i', self.binary, self.cursor)
+        result, = unpack_int32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_int64(self):
-        result, = unpack_from('<q', self.binary, self.cursor)
+        result, = unpack_int64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
     def _read_le_uint16(self):
-        result, = unpack_from('<H', self.binary, self.cursor)
+        result, = unpack_uint16_from(self.binary, self.cursor)
         self.cursor += 2
         return result
 
     def _read_le_uint32(self):
-        result, = unpack_from('<I', self.binary, self.cursor)
+        result, = unpack_uint32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_uint64(self):
-        result, = unpack_from('<Q', self.binary, self.cursor)
+        result, = unpack_uint64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
@@ -255,15 +258,11 @@ class DeserializerAuxPow(Deserializer):
         return self._read_nbytes(header_end)
 
 
-class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
-    '''Class representing a JoinSplit transaction.'''
-
-    @cachedproperty
-    def is_coinbase(self):
-        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
+    pass
 
 
-class DeserializerZcash(Deserializer):
+class DeserializerEquihash(Deserializer):
     def read_header(self, height, static_header_size):
         '''Return the block header bytes'''
         start = self.cursor
@@ -275,6 +274,20 @@ class DeserializerZcash(Deserializer):
         self.cursor = start
         return self._read_nbytes(header_end)
 
+
+class DeserializerEquihashSegWit(DeserializerSegWit, DeserializerEquihash):
+    pass
+
+
+class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a JoinSplit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+
+
+class DeserializerZcash(DeserializerEquihash):
     def read_tx(self):
         start = self.cursor
         base_tx =  TxJoinSplit(
@@ -333,3 +346,39 @@ class DeserializerReddcoin(Deserializer):
             outputs,
             locktime,
         ), double_sha256(self.binary[start:self.cursor])
+
+
+class DeserializerTxTimeAuxPow(DeserializerTxTime):
+    VERSION_AUXPOW = (1 << 8)
+
+    def is_merged_block(self):
+        start = self.cursor
+        self.cursor = 0
+        version = self._read_le_uint32()
+        self.cursor = start
+        if version & self.VERSION_AUXPOW:
+            return True
+        return False
+
+    def read_header(self, height, static_header_size):
+        '''Return the AuxPow block header bytes'''
+        start = self.cursor
+        version = self._read_le_uint32()
+        if version & self.VERSION_AUXPOW:
+            # We are going to calculate the block size then read it as bytes
+            self.cursor = start
+            self.cursor += static_header_size  # Block normal header
+            self.read_tx()  # AuxPow transaction
+            self.cursor += 32  # Parent block hash
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size  # Merkle branch
+            self.cursor += 4  # Index
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size  # Chain merkle branch
+            self.cursor += 4  # Chain index
+            self.cursor += 80  # Parent block header
+            header_end = self.cursor
+        else:
+            header_end = static_header_size
+        self.cursor = start
+        return self._read_nbytes(header_end)

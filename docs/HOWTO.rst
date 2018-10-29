@@ -10,7 +10,7 @@ small - pull requests are welcome.
 ================ ========================
 Package          Notes
 ================ ========================
-Python3          ElectrumX uses asyncio.  Python version >= 3.5.3 is
+Python3          ElectrumX uses asyncio.  Python version >= 3.6 is
                  **required**.
 `aiohttp`_       Python library for asynchronous HTTP.  Version >=
                  1.0 required; I am using 1.0.5.
@@ -18,10 +18,6 @@ Python3          ElectrumX uses asyncio.  Python version >= 3.5.3 is
 DB Engine        I use `plyvel`_ 0.9, a Python interface to LevelDB.
                  A database engine package is required but others
                  are supported (see **Database Engine** below).
-`IRC`_           Python IRC package.  Only required if you enable
-                 IRC; ElectrumX will happily serve clients that
-                 try to connect directly.  I use 15.0.4 but
-                 older versions likely are fine.
 `x11_hash`_      Only required for DASH.  Python X11 Hash package.  Only
                  required if for Dash.  Version 1.4 tested.
 ================ ========================
@@ -203,9 +199,9 @@ set TimeoutStopSec to *at least* 10 mins in your `.service` file.
 Installing Python 3.6 under Ubuntu
 ----------------------------------
 
-Many Ubuntu distributions have an incompatible Python version baked in.
-Because of this, it is easier to install Python 3.6 rather than attempting
-to update Python 3.5.2 to 3.5.3.  See `contrib/python3.6/python-3.6.sh`_.
+Many Ubuntu distributions have an incompatible Python version baked
+in.  Because of this, it is easier to install Python 3.6.  See
+`contrib/python3.6/python-3.6.sh`_.
 
 
 Installing on Raspberry Pi 3
@@ -394,6 +390,19 @@ need to run your server with a different server name and a new
 certificate.  Therefore it's a good idea to make an offline backup
 copy of your certificate and key in case you need to restore them.
 
+Running on a privileged port
+============================
+
+You may choose to run electrumx on a different port than 50001 / 50002.
+If you choose a privileged port ( < 1024 ) it makes sense to make use of a iptables NAT rule.
+
+An example, which will forward Port 110 to the internal port 50002 follows:
+
+    iptables -t nat -A PREROUTING -p tcp --dport 110 -j DNAT --to-destination 127.0.0.1:50002
+
+You can then set the port as follows and advertise the service externally on the privileged port
+    REPORT_SSL_PORT=110
+
 
 .. _`ENVIRONMENT.rst`: https://github.com/litebitcoins/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _`contrib/systemd/electrumx.service`: https://github.com/litebitcoins/electrumx/blob/master/contrib/systemd/electrumx.service
@@ -401,7 +410,6 @@ copy of your certificate and key in case you need to restore them.
 .. _`runit`: http://smarden.org/runit/index.html
 .. _`aiohttp`: https://pypi.python.org/pypi/aiohttp
 .. _`pylru`: https://pypi.python.org/pypi/pylru
-.. _`IRC`: https://pypi.python.org/pypi/irc
 .. _`x11_hash`: https://pypi.python.org/pypi/x11_hash
 .. _`contrib/python3.6/python-3.6.sh`: https://github.com/litebitcoins/electrumx/blob/master/contrib/python3.6/python-3.6.sh
 .. _`contrib/raspberrypi3/install_electrumx.sh`: https://github.com/litebitcoins/electrumx/blob/master/contrib/raspberrypi3/install_electrumx.sh
